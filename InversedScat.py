@@ -44,7 +44,7 @@ def a0():
     return a_0
     
 #Compute the coeeficients of the scattering solution u   
-def Computebc():
+def ScatteringCoeff():
     global n, kappa, a    
     
     b = np.zeros((n,), dtype=np.complex)
@@ -64,7 +64,8 @@ def Computebc():
 
     return b, c
     
-########################## MAIN FUNCTION ###########################    
+########################## MAIN FUNCTION ###########################  
+    
 #def main():
     
 #Radius of a ball    
@@ -82,7 +83,7 @@ alpha = a*np.array([np.cos(theta)*np.sin(phi),np.sin(theta)*np.sin(phi),np.cos(p
 theta, phi = thetaphi(alpha)
 
 #Compute the coefficients of the scattering solution
-b, c = Computebc()
+b, c = ScatteringCoeff()
 
 
     
