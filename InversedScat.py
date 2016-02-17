@@ -4,7 +4,7 @@ import numpy as np
 import pylab as pl
 import math
 # For higher precision:
-#import mpmath
+import mpmath
 import time
 
 
@@ -162,7 +162,7 @@ q = 45
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
-n = 20
+n = 10
 print("The number of terms that approximates the scattering solution, n =", n)
 
 theta, phi = np.pi/2, np.pi/2
