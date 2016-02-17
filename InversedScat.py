@@ -192,21 +192,26 @@ AnnulusR = np.linspace(a*1.1, b*0.9, numRadius)
 Alpha = np.zeros((rootn**2,3))
 X = np.zeros(((rootn**2)*numRadius,3))
 
+#Create a mesh on the sphere S^2
 for l1 in range(rootn):
     for l2 in range(rootn):
         index = l1*rootn + l2
         Alpha[index] = np.array([np.cos(Theta[l1])*np.sin(Phi[l2]),np.sin(Theta[l1])*np.sin(Phi[l2]),np.cos(Phi[l2])])
 
+#Create a grid for the annulus X(a,b)
 l1 = 0
 for R in AnnulusR: 
     X[l1:l1+Alpha.shape[0]] = Alpha*R
     l1 += Alpha.shape[0]
 
+#Compute the coefficients of wave scattering solution corresponding to different
+#directions of incident wave
 AL = np.zeros((n,n), dtype=np.complex)
 BL = np.zeros((n,n), dtype=np.complex)
 for l1 in range(n):
     AL[l1], BL[l1] = ScatteringCoeff(Alpha[l1,:], a, kappa)
         
+#Infinitesimals for computing the surface and volume integrals in fun()        
 delta = (4*np.pi*a**2)/n
 deltaX = VolX/X.shape[0]    
 theta1 = beta    
