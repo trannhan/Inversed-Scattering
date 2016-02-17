@@ -134,13 +134,15 @@ def fun(nu):
     return ISum*deltaX
     
 #Minimize fun in the annulus a<x<b, x in R^3    
-def FindNu():
+def FindOptimizedVec():
     global n
     
     nu = np.zeros((n,))
-    res = optimize.minimize(fun, nu, method='BFGS', options={'disp': True})    
+    res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-16, 'disp': True})  #the best              
+    #res = optimize.fmin_cg(fun, nu, gtol=1e-8)    
+    #res = optimize.least_squares(fun, nu)
     
-    return res.x
+    return res
     
     
 ########################## MAIN FUNCTION ###########################  
@@ -158,11 +160,11 @@ VolX = (4*np.pi/3)*(b**3-a**3)
 #Divide the radius of the annulus from a->b into numRadius parts
 numRadius = 3
 
-q = 45
+q = 3
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
-n = 10
+n = 4
 print("The number of terms that approximates the scattering solution, n =", n)
 
 theta, phi = np.pi/2, np.pi/2
@@ -188,7 +190,7 @@ print("Scattering solution at the point x, u =", uu)
 rootn = int(np.ceil(np.sqrt(n)))
 Theta = np.linspace(0, 2*np.pi, rootn)
 Phi = np.linspace(0.1, np.pi-0.1, rootn)
-AnnulusR = np.linspace(a*1.1, b*0.9, numRadius)
+AnnulusRadi = np.linspace(a*1.1, b*0.9, numRadius)
 Alpha = np.zeros((rootn**2,3))
 X = np.zeros(((rootn**2)*numRadius,3))
 
@@ -200,7 +202,7 @@ for l1 in range(rootn):
 
 #Create a grid for the annulus X(a,b)
 l1 = 0
-for R in AnnulusR: 
+for R in AnnulusRadi: 
     X[l1:l1+Alpha.shape[0]] = Alpha*R
     l1 += Alpha.shape[0]
 
@@ -215,7 +217,7 @@ for l1 in range(n):
 delta = (4*np.pi*a**2)/n
 deltaX = VolX/X.shape[0]    
 theta1 = beta    
-nu = FindNu()
+nu = FindOptimizedVec()
 
 Time = "\nTime elapsed: " + str(time.time()-startTime) + " seconds"
 print(Time)
