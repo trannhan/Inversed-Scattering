@@ -10,18 +10,20 @@ import time
 
 #Convert a point alpha in S^2 to angles theta and phi
 def thetaphi(alpha):      
-    alpha /= np.linalg.norm(alpha)     
+    alpha /= np.linalg.norm(alpha)  
+    #alpha = np.real(alpha)
     
     phi = math.acos(alpha[2])
-    sinphi = math.sqrt(1-alpha[2]**2)
-    if(sinphi != 0):
+    theta = np.pi/2
+    sinphi = np.sin(phi)
+    
+    if(np.abs(sinphi) > ZERO):
         sintheta = alpha[1]/sinphi
         costheta = alpha[0]/sinphi
-        tantheta = sintheta/costheta
-        theta = math.atan(tantheta)
-    else:
-        theta = np.pi/2
-    
+        if(np.abs(costheta) > ZERO):
+            tantheta = sintheta/costheta
+            theta = math.atan(tantheta)
+         
     return theta, phi
     
     
@@ -117,7 +119,7 @@ def ScatteringSolution(x, alpha, Al, n):
 #x: a point in R^3   
 #Alpha: a vector of different incident directions 
 def u(x, Alpha):
-    global n, a, kappa, AL
+    global n, a, AL
 
     r = np.linalg.norm(x)
     h, hp = special.sph_yn(n-1, r) #arrays of Bessel 2nd kind and its derivatives
@@ -151,20 +153,7 @@ def FindOptimizedVec(theta):
     #res = optimize.least_squares(fun, nu)
     
     return res
-
-#|thetap| -> infinity
-#theta, thetap in M={z: z in C, z.z=1}
-def ChooseThetaThetap():
-    t = 10000
-    v = t/2
-    w = -v
-    b1 = 0
-    b2 = np.sqrt(w**2-1)
-    theta = np.array([1j*b1,1j*b2,w])
-    thetap = np.array([1j*b1,1j*b2,v])
  
-    return theta, thetap
-    
 
 #Compute the Fourier transform of the recovered potential
 #nu: optimized vector
@@ -202,18 +191,34 @@ def FourierPotential(q, a, psi, n):
         ISum += np.exp(-1j*np.dot(psi,y))
         
     return ISum*q*deltaBa
+    
+    
+#|thetap| -> infinity
+#theta, thetap in M={z: z in C, z.z=1}
+def ChooseThetaThetap():
+    t = 10**90
+    v = t/2
+    w = -v
+    b1 = 0
+    b2 = np.sqrt(w**2-1)
+    theta = np.array([b1, b2, w])
+    thetap = np.array([b1, b2, v])
+ 
+    return theta, thetap
         
     
 ########################## MAIN FUNCTION ###########################  
     
 #def main():
 
-startTime = time.time()  
 mp.dps = 16
-#print(mp)     
+#print(mp) 
+ZERO = 10**(-16)
+
+startTime = time.time()     
 
 a = 1
-print("Radius of a ball in R^3, a =", a)
+print("\nRadius of a ball in R^3, a =", a)
 #Create an annulus X(a,b)
 b = 2
 #Volume of the annulus X
@@ -242,10 +247,10 @@ print("Unit vector in the direction of x, beta =", beta)
 Al, Bl = ScatteringCoeff(alpha, a, kappa, n)
 
 AA = ScatteringAmplitude(beta, Al, n)
-print("Scattering amplitude at the point x, A =", AA)
+print("\nScattering amplitude at the point x, A =", AA)
 
 uu = ScatteringSolution(x, alpha, Al, n)
-print("Scattering solution at the point x, u =", uu)
+print("Scattering solution at the point x, u =", uu, "\n")
 
 #Minimize to find nu
 rootn = int(np.ceil(np.sqrt(n)))
@@ -279,12 +284,15 @@ delta = (4*np.pi)/n         #infinitesimal of S^2, unit sphere
 deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
+#psi = thetap-theta, |thetap| -> infinity
 theta, thetap = ChooseThetaThetap()    
 psi = thetap - theta
+
 nu = FindOptimizedVec(theta)
+
 Fq1 = FourierRecoveredPotential(nu.x, thetap, n)
 Fq2 = FourierPotential(q, a, psi, n)
-print("Fourier transform of the recovered potential:", Fq1)
+print("\nFourier transform of the recovered potential:", Fq1)
 print("Fourier transform of the actual potential q: ", Fq2)
 
 Time = "\nTime elapsed: " + str(time.time()-startTime) + " seconds"
