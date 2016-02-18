@@ -4,7 +4,7 @@ import numpy as np
 import pylab as pl
 import math
 # For higher precision:
-import mpmath
+#import mpmath
 import time
 
 
@@ -85,6 +85,7 @@ def ScatteringAmplitude(beta, Al):
         A += Al[l]*Y(l, theta, phi)
     
     return A
+
     
 #Return the scattering solution at the point x with incident direction alpha   
 def ScatteringSolution(x, alpha, Al):
@@ -164,8 +165,8 @@ q = 3
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
-n = 4
-print("The number of terms that approximates the scattering solution, n =", n)
+n = 10
+print("The number of terms that approximate the scattering solution, n =", n)
 
 theta, phi = np.pi/2, np.pi/2
 alpha = np.array([np.cos(theta)*np.sin(phi),np.sin(theta)*np.sin(phi),np.cos(phi)])
