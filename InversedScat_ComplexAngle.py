@@ -4,7 +4,7 @@ import numpy as np
 import pylab as pl
 import cmath
 # For higher precision:
-from mpmath import mp
+#from mpmath import mp
 import time
 
 
@@ -195,9 +195,8 @@ def FourierPotential(q, a, psi, n):
     
 #|thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
-def ChooseThetaThetap():
-    t = 10**17
-    v = t/2
+def ChooseThetaThetap(bigRealNum):
+    v = bigRealNum/2
     w = -v
     b1 = 0
     b2 = np.sqrt(w**2 - 1 - b1**2)
@@ -211,7 +210,7 @@ def ChooseThetaThetap():
     
 #def main():
 
-mp.dps = 16
+#mp.dps = 16
 #print(mp) 
 ZERO = 10**(-16)
 
@@ -291,7 +290,7 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap()    
+theta, thetap = ChooseThetaThetap(10**17)    
 psi = thetap - theta
 
 nu = FindOptimizedVec(theta)
