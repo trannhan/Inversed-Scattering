@@ -8,13 +8,13 @@ import cmath
 import time
 
 
-#Convert a point alpha in R^3 to angles theta and phi
+#Convert a point alpha in C^3 to complex angles theta and phi
 def thetaphi(alpha):      
     #alpha /= np.linalg.norm(alpha)  
     #alpha = np.real(alpha)
     
     phi = cmath.acos(alpha[2])
-    theta = np.pi/2
+    theta = complex(np.pi/2)
     sinphi = cmath.sin(phi)
     
     if(np.abs(sinphi) > ZERO):
