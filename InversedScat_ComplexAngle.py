@@ -2,6 +2,10 @@ import scipy as sci
 from scipy import optimize, special
 import numpy as np
 import pylab as pl
+#import matplotlib
+import matplotlib.pyplot as plt 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm, colors
 import cmath
 # For higher precision:
 #from mpmath import mp
@@ -33,8 +37,10 @@ def Y(l, theta, phi):
     
     for m in np.arange(-l,l+1):
         Yl[m+l] = sci.special.sph_harm(m,l,theta,phi)
+        #Yl += sci.special.sph_harm(m,l,theta,phi)
         
     return np.sum(Yl)
+    
     
 #Return a vector of the sum of spherical harmonic Y   
 #n: the number of terms for approximation
@@ -93,6 +99,7 @@ def ScatteringCoeff(alpha, a, kappa, n):
 def ScatteringAmplitude(beta, Al, n): 
     return np.sum(Al*Yvec(n, beta))
 
+
 #Compute the scattering amplitude
 def A(beta, alpha, n): 
     global a, kappa
@@ -100,6 +107,7 @@ def A(beta, alpha, n):
     Al, Bl = ScatteringCoeff(alpha, a, kappa, n)
     
     return np.sum(Al*Yvec(n, beta))    
+    
     
 #Return the scattering solution at the point x with incident direction alpha   
 #x: a point in R^3  
@@ -132,6 +140,7 @@ def u(x, Alpha):
     
     return U    
     
+    
 #Define the scattering function that needs to be minimized    
 def fun(nu):
     global theta, X, delta, deltaX, Alpha
@@ -141,6 +150,7 @@ def fun(nu):
         ISum += np.abs(cmath.exp(-1j*np.dot(theta, x))*np.sum(u(x, Alpha)*nu)*delta-1)**2        
         
     return ISum*deltaX
+    
     
 #Minimize fun in the annulus a<x<b, x in R^3    
 #theta, thetap in M={z: z in C, z.z=1}
@@ -206,6 +216,55 @@ def ChooseThetaThetap(bigRealNum):
     return theta, thetap
         
     
+################## Visualize results ###################
+def Visualize(Matrix):
+    R = np.abs(Matrix)
+    
+    ############## Cartesian plot ##############
+    Theta = np.linspace(0, 2*np.pi, n)
+    Phi = np.linspace(0, np.pi, n)
+    PHI, THETA = np.meshgrid(Phi, Theta)
+    
+    X1 = R * np.sin(PHI) * np.cos(THETA)
+    X2 = R * np.sin(PHI) * np.sin(THETA)
+    X3 = R * np.cos(PHI)
+    
+    N = R/R.max()
+    
+    #matplotlib.rc('text', usetex=True)
+    #matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'), figsize=(12,10))
+    im = ax.plot_surface(X1, X2, X3, rstride=1, cstride=1, facecolors=cm.jet(N))
+    ax.set_title(r'$|A_l|$', fontsize=20)
+    m = cm.ScalarMappable(cmap=cm.jet)
+    m.set_array(R)    # Assign the unnormalized data array to the mappable
+                      #so that the scale corresponds to the values of R
+    fig.colorbar(m, shrink=0.8);
+    
+    ############## Spherical plot ##############
+    # Coordinate arrays for the graphical representation
+    x = np.linspace(-np.pi, np.pi, n)
+    y = np.linspace(-np.pi/2, np.pi/2, n)
+    X, Y = np.meshgrid(x, y)
+    
+    # Spherical coordinate arrays derived from x, y
+    # Necessary conversions to get Mollweide right
+    theta = x.copy()    # physical copy
+    theta[x < 0] = 2 * np.pi + x[x<0]
+    phi = np.pi/2 - y
+    PHI, THETA = np.meshgrid(phi, theta)
+    
+    fig, ax = plt.subplots(subplot_kw=dict(projection='mollweide'), figsize=(10,8))
+    im = ax.pcolormesh(X, Y , R)
+    #ax.set_xticklabels(xlabels, fontsize=14)
+    #ax.set_yticklabels(ylabels, fontsize=14)
+    ax.set_title('$|A_l|$', fontsize=20)
+    ax.set_xlabel(r'$\boldsymbol \theta$', fontsize=20)
+    ax.set_ylabel(r'$\boldsymbol{\phi}$', fontsize=20)
+    ax.grid()
+    fig.colorbar(im, orientation='horizontal');  
+      
+    
 ########################## MAIN FUNCTION ###########################  
     
 #def main():
@@ -217,19 +276,18 @@ ZERO = 10**(-16)
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-
-n = 4
-print("\nThe number of terms that approximate the scattering solution, n =", n)
+n = 9
+print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1.0
 print("Radius of a ball in R^3, a =", a)
 
 #Create an annulus X(a,b)
-b = 1.1
+b = 1.2
 #Volume of the annulus X
 VolX = (4*np.pi/3)*(b**3-a**3)  
 #Divide the radius of the annulus from a->b into numRadius parts
-numRadius = 3
+numRadius = 1
 
 q = 3.0
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
@@ -251,7 +309,7 @@ print("Unit vector in the direction of x, beta =", beta)
 Al, Bl = ScatteringCoeff(alpha, a, kappa, n)
 
 AA = ScatteringAmplitude(beta, Al, n)
-print("\nScattering amplitude at the point x, A =", AA)
+print("\nOUTPUTS:\nScattering amplitude at the point x, A =", AA)
 
 uu = ScatteringSolution(x, alpha, Al, n)
 print("Scattering solution at the point x, u =", uu, "\n")
@@ -290,7 +348,7 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**17)    
+theta, thetap = ChooseThetaThetap(10**16)    
 psi = thetap - theta
 
 nu = FindOptimizedVec(theta)
@@ -299,6 +357,8 @@ Fq1 = FourierRecoveredPotential(nu.x, thetap, n)
 Fq2 = FourierPotential(q, a, psi, n)
 print("\nFourier transform of the recovered potential:", Fq1)
 print("Fourier transform of the actual potential q: ", Fq2)
+
+Visualize(AL)
 
 Time = "\nTime elapsed: " + str(time.time()-startTime) + " seconds"
 print(Time)
