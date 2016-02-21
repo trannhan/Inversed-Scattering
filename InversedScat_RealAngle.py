@@ -8,6 +8,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm, colors
 import cmath
 import math
+import sympy as sp
+from sympy.mpmath import *
 # For higher precision:
 #from mpmath import mp
 import time
@@ -207,13 +209,6 @@ def FourierPotential1(q, a, psi, n):
     return ISum*q*deltaBa
     
     
-#Use this f with:
-#    I = quad(f, [0, a], [0, 2*pi], [0, pi])            #very slow
-#    I = sci.integrate.tplquad(f, 0, a, 0, 2*pi, 0, pi)    
-#def f(r,t,p):
-#    return np.exp(-1j*r*(cos(t)*sin(p)*psi[0] + sin(t)*sin(p)*psi[1] + cos(p)*psi[2]))*r*r*sin(p)
-
-
 #Compute the Fourier transform of the potential q
 #psi = thetap-theta, |thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
@@ -291,14 +286,14 @@ def Visualize(Matrix):
     
 #def main():
 
-#mp.dps = 15
+mp.dps = 15
 #print(mp) 
 ZERO = 10**(-16)
 
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 9
+n = 10
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
@@ -370,7 +365,7 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**16)    
+theta, thetap = ChooseThetaThetap(10**2)    
 psi = thetap - theta
 
 res = FindOptimizedVec(theta)
