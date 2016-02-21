@@ -41,26 +41,35 @@ def thetaphi(alpha):
     return theta, phi
 
 
-#Compute the Associated Legendre polynomials (only depend on z, divided by sin(phi))
-#Equivalent to scipy.special.clpmn(m, n, z, type=2), but can take negative m, l
+#Compute the Associated Legendre polynomials of type 1 with complex z
 #|m| <= l
-def P(l,m,z):
-    if(l<0):
-        return P(-l-1, m)
+def P(l,m,z):    
     if(np.abs(m)>l):
         return 0
-    if(m<0):
-        return ((-1)**m)*(math.factorial(l-m)/math.factorial(l+m))*P(l, -m, z)
-    
     if(l == 0) and (m==0):
         return 1
     if(l == m):
-        return ((-1)**m)*doublefactorial(2*m-1)*((1-z**2)**(m/2))
+        return ((-1)**m)*doublefactorial(2*m-1)*((1-z*z)**(m/2))
     if(l-m==1):
         return z*(2*m+1)*P(m, m, z)
     
     return (z*(2*l-1)*P(l-1, m, z) - (l+m-1)*P(l-2, m, z))/(l-m)
         
+
+#Compute the Associated Legendre polynomials of type 1 with complex z
+#Equivalent to scipy.special.clpmn(m, n, z, type=2), but can take negative m, l
+#|m| <= l
+def LegendrePoly(l,m,z):
+    if(np.abs(m)>l):
+        return 0
+    if l<0 and m>=0:
+        return P(-l-1, m, z)
+    if m<0 and l>=0:
+        return ((-1)**m)*(math.factorial(l-m)/math.factorial(l+m))*P(l, -m, z)
+    if m<0 and l<0:
+        return 0
+    
+    return P(l,m,z)
     
 #Return the sum of spherical harmonic Y   
 #l: positive integer
@@ -79,12 +88,12 @@ def Y(l, theta, phi):
 #l: positive integer
 #theta, phi: complex angles
 def complexY(l, theta, phi):     
-    LP, DLP = sci.special.clpmn(l, l, cmath.cos(phi), type=2)
+    LP, DLP = sci.special.clpmn(l, l, np.cos(phi), type=2)
     Yl = np.zeros((2*l+1,), dtype=np.complex)
     
     for m in np.arange(0,l+1):
         Klm = (((-1)**m)*(1j**l)/math.sqrt(4*np.pi))*math.sqrt((2*l+1)*math.factorial(l-m)/math.factorial(l+m))
-        Yl[m+l] = Klm*cmath.exp(1j*m*theta)*LP[l,m]
+        Yl[m+l] = Klm*np.exp(1j*m*theta)*LP[l,m]
     for m in np.arange(-l,0):
         Yl[m+l] = (-1)**(l+m)*np.conj(Yl[-m+l])
         
@@ -180,7 +189,7 @@ def ScatteringSolution(x, alpha, Al, n):
     h, hp = special.sph_yn(n-1, r) #arrays of Bessel 2nd kind and its derivatives
 
     #Return u = incident field + scattered field
-    return cmath.exp(1j*np.dot(alpha, x)) + sum(Al*h*complexYvec(n, x/r)) 
+    return np.exp(1j*np.dot(alpha, x)) + sum(Al*h*complexYvec(n, x/r)) 
 
 
 #Return an array of scattering solution at the point x with different incident 
@@ -197,7 +206,7 @@ def u(x, Alpha):
     
     U = np.zeros((n,), dtype=np.complex)
     for l in range(n):
-        U[l] = cmath.exp(1j*np.dot(Alpha[l,:], x)) + sum(AL[l]*hYY)        
+        U[l] = np.exp(1j*np.dot(Alpha[l,:], x)) + sum(AL[l]*hYY)        
     
     return U    
     
@@ -208,7 +217,7 @@ def fun(nu):
     
     ISum = 0
     for x in X:
-        ISum += np.abs(cmath.exp(-1j*np.dot(theta, x))*sum(u(x, Alpha)*nu)*delta-1)**2        
+        ISum +=  np.abs(np.exp(-1j*np.dot(theta, x))*sum(u(x, Alpha)*nu)*delta-1)**2
         
     return ISum*deltaX
     
@@ -219,8 +228,8 @@ def FindOptimizedVec(theta):
     global n
     
     nu = np.zeros((n,))
-    res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-16, 'disp': True})  #the best              
-    #res = optimize.fmin_cg(fun, nu, gtol=1e-8)    
+    res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-6, 'disp': True})  #the best              
+    #res = optimize.fmin_cg(fun, nu, gtol=1e-6)    
     #res = optimize.least_squares(fun, nu)
     
     return res
@@ -259,16 +268,16 @@ def FourierPotential1(q, a, psi, n):
     deltaBa = (4*np.pi*a**3)/(3*Ba.shape[0])
     ISum = 0    
     for y in Ba:
-        ISum += cmath.exp(-1j*np.dot(psi,y))
+        ISum += np.exp(-1j*np.dot(psi,y))
         
     return ISum*q*deltaBa
     
     
 #Use this f with:
-#    I = quad(f, [0, a], [0, 2*pi], [0, pi])
+#    I = quad(f, [0, a], [0, 2*pi], [0, pi])            #very slow
 #    I = sci.integrate.tplquad(f, 0, a, 0, 2*pi, 0, pi)    
 #def f(r,t,p):
-#    return np.exp(r*(cos(t)*sin(p)*psi[0] + sin(t)*sin(p)*psi[1] + cos(p)*psi[2]))*(r**2)*sin(p)
+#    return np.exp(-1j*r*(cos(t)*sin(p)*psi[0] + sin(t)*sin(p)*psi[1] + cos(p)*psi[2]))*r*r*sin(p)
 
 
 #Compute the Fourier transform of the potential q
@@ -276,8 +285,8 @@ def FourierPotential1(q, a, psi, n):
 #theta, thetap in M={z: z in C, z.z=1}
 def FourierPotential(q, a, psi):
     r, t, p = sp.symbols('r, t, p')
-    f = sp.exp(-1j*r*(sp.cos(t)*sp.sin(p)*psi[0] + sp.sin(t)*sp.sin(p)*psi[1] + sp.cos(p)*psi[2]))*(r**2)*sp.sin(p)  
-    I = sp.integrate(f, (r, 0, a), (t, 0, 2*pi), (p, 0, pi))
+    f = sp.exp(-1j*r*(sp.cos(t)*sp.sin(p)*psi[0] + sp.sin(t)*sp.sin(p)*psi[1] + sp.cos(p)*psi[2]))*r*r*sp.sin(p)  
+    I = sp.integrate(f, (r, 0, a), (t, 0, 2*sp.pi), (p, 0, sp.pi))
     
     return q*I
     
@@ -288,7 +297,7 @@ def ChooseThetaThetap(bigRealNum):
     v = bigRealNum/2
     w = -v
     b1 = 0
-    b2 = math.sqrt(w**2 - 1 - b1**2)
+    b2 = np.sqrt(w**2 - 1 - b1**2)
     theta = np.array([b1*1j, b2*1j, w], dtype=np.complex)
     thetap = np.array([b1*1j, b2*1j, v], dtype=np.complex)
  
@@ -355,7 +364,7 @@ ZERO = 10**(-16)
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 4
+n = 20
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
@@ -366,7 +375,7 @@ b = 1.2
 #Volume of the annulus X
 VolX = (4*np.pi/3)*(b**3-a**3)  
 #Divide the radius of the annulus from a->b into numRadius parts
-numRadius = 2
+numRadius = 1
 
 q = 3
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
@@ -427,14 +436,15 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**27)    
+theta, thetap = ChooseThetaThetap(10**2)    
 psi = thetap - theta
 
-nu = FindOptimizedVec(theta)
+res = FindOptimizedVec(theta)
 
-Fq1 = FourierRecoveredPotential(nu.x, thetap, n)
-Fq2 = FourierPotential(q, a, psi)
+Fq1 = FourierRecoveredPotential(res.x, thetap, n)
 print("\nFourier transform of the recovered potential:", Fq1)
+#Fq2 = FourierPotential(q, a, psi)
+Fq2 = 0
 print("Fourier transform of the actual potential q: ", Fq2)
 
 #Visualize(AL)

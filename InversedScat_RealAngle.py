@@ -123,7 +123,7 @@ def ScatteringSolution(x, alpha, Al, n):
     h, hp = special.sph_yn(n-1, r) #arrays of Bessel 2nd kind and its derivatives
 
     #Return u = incident field + scattered field
-    return cmath.exp(1j*np.dot(alpha, x)) + np.sum(Al*h*Yvec(n, x/r)) 
+    return np.exp(1j*np.dot(alpha, x)) + np.sum(Al*h*Yvec(n, x/r)) 
 
 
 #Return an array of scattering solution at the point x with different incident 
@@ -140,7 +140,7 @@ def u(x, Alpha):
     
     U = np.zeros((n,), dtype=np.complex)
     for l in range(n):
-        U[l] = cmath.exp(1j*np.dot(Alpha[l,:], x)) + np.sum(AL[l]*hYY)        
+        U[l] = np.exp(1j*np.dot(Alpha[l,:], x)) + sum(AL[l]*hYY)        
     
     return U    
     
@@ -151,7 +151,7 @@ def fun(nu):
     
     ISum = 0
     for x in X:
-        ISum += np.abs(cmath.exp(-1j*np.dot(theta, x))*np.sum(u(x, Alpha)*nu)*delta-1)**2        
+        ISum +=  np.abs(np.exp(-1j*np.dot(theta, x))*sum(u(x, Alpha)*nu)*delta-1)**2
         
     return ISum*deltaX
     
@@ -161,9 +161,9 @@ def fun(nu):
 def FindOptimizedVec(theta):
     global n
     
-    nu = np.zeros((n,), dtype=np.complex)
-    res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-16, 'disp': True})  #the best              
-    #res = optimize.fmin_cg(fun, nu, gtol=1e-8)    
+    nu = np.zeros((n,))
+    res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-6, 'disp': True})  #the best              
+    #res = optimize.fmin_cg(fun, nu, gtol=1e-6)    
     #res = optimize.least_squares(fun, nu)
     
     return res
@@ -187,7 +187,7 @@ def FourierRecoveredPotential(nu, thetap, n):
 #Compute the Fourier transform of the potential q
 #psi = thetap-theta, |thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
-def FourierPotential(q, a, psi, n):
+def FourierPotential1(q, a, psi, n):
     global Alpha, numRadius
     
     #Create a grid for the ball B(a)
@@ -202,9 +202,27 @@ def FourierPotential(q, a, psi, n):
     deltaBa = (4*np.pi*a**3)/(3*Ba.shape[0])
     ISum = 0    
     for y in Ba:
-        ISum += cmath.exp(-1j*np.dot(psi,y))
+        ISum += np.exp(-1j*np.dot(psi,y))
         
     return ISum*q*deltaBa
+    
+    
+#Use this f with:
+#    I = quad(f, [0, a], [0, 2*pi], [0, pi])            #very slow
+#    I = sci.integrate.tplquad(f, 0, a, 0, 2*pi, 0, pi)    
+#def f(r,t,p):
+#    return np.exp(-1j*r*(cos(t)*sin(p)*psi[0] + sin(t)*sin(p)*psi[1] + cos(p)*psi[2]))*r*r*sin(p)
+
+
+#Compute the Fourier transform of the potential q
+#psi = thetap-theta, |thetap| -> infinity
+#theta, thetap in M={z: z in C, z.z=1}
+def FourierPotential(q, a, psi):
+    r, t, p = sp.symbols('r, t, p')
+    f = sp.exp(-1j*r*(sp.cos(t)*sp.sin(p)*psi[0] + sp.sin(t)*sp.sin(p)*psi[1] + sp.cos(p)*psi[2]))*r*r*sp.sin(p)  
+    I = sp.integrate(f, (r, 0, a), (t, 0, 2*sp.pi), (p, 0, sp.pi))
+    
+    return q*I
     
     
 #|thetap| -> infinity
@@ -273,17 +291,17 @@ def Visualize(Matrix):
     
 #def main():
 
-#mp.dps = 16
+#mp.dps = 15
 #print(mp) 
 ZERO = 10**(-16)
 
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 4
+n = 9
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
-a = 1.0
+a = 1
 print("Radius of a ball in R^3, a =", a)
 
 #Create an annulus X(a,b)
@@ -293,7 +311,7 @@ VolX = (4*np.pi/3)*(b**3-a**3)
 #Divide the radius of the annulus from a->b into numRadius parts
 numRadius = 1
 
-q = 3.0
+q = 3
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
@@ -355,11 +373,12 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 theta, thetap = ChooseThetaThetap(10**16)    
 psi = thetap - theta
 
-nu = FindOptimizedVec(theta)
+res = FindOptimizedVec(theta)
 
-Fq1 = FourierRecoveredPotential(nu.x, thetap, n)
-Fq2 = FourierPotential(q, a, psi, n)
+Fq1 = FourierRecoveredPotential(res.x, thetap, n)
 print("\nFourier transform of the recovered potential:", Fq1)
+#Fq2 = FourierPotential(q, a, psi)
+Fq2 = 0
 print("Fourier transform of the actual potential q: ", Fq2)
 
 #Visualize(AL)
