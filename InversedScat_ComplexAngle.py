@@ -8,6 +8,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm, colors
 import cmath
 import math
+import sympy as sp
+from sympy.mpmath import *
 # For higher precision:
 #from mpmath import mp
 import time
@@ -242,7 +244,7 @@ def FourierRecoveredPotential(nu, thetap, n):
 #Compute the Fourier transform of the potential q
 #psi = thetap-theta, |thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
-def FourierPotential(q, a, psi, n):
+def FourierPotential1(q, a, psi, n):
     global Alpha, numRadius
     
     #Create a grid for the ball B(a)
@@ -260,6 +262,24 @@ def FourierPotential(q, a, psi, n):
         ISum += cmath.exp(-1j*np.dot(psi,y))
         
     return ISum*q*deltaBa
+    
+    
+#Use this f with:
+#    I = quad(f, [0, a], [0, 2*pi], [0, pi])
+#    I = sci.integrate.tplquad(f, 0, a, 0, 2*pi, 0, pi)    
+#def f(r,t,p):
+#    return np.exp(r*(cos(t)*sin(p)*psi[0] + sin(t)*sin(p)*psi[1] + cos(p)*psi[2]))*(r**2)*sin(p)
+
+
+#Compute the Fourier transform of the potential q
+#psi = thetap-theta, |thetap| -> infinity
+#theta, thetap in M={z: z in C, z.z=1}
+def FourierPotential(q, a, psi):
+    r, t, p = sp.symbols('r, t, p')
+    f = sp.exp(-1j*r*(sp.cos(t)*sp.sin(p)*psi[0] + sp.sin(t)*sp.sin(p)*psi[1] + sp.cos(p)*psi[2]))*(r**2)*sp.sin(p)  
+    I = sp.integrate(f, (r, 0, a), (t, 0, 2*pi), (p, 0, pi))
+    
+    return q*I
     
     
 #|thetap| -> infinity
@@ -328,7 +348,7 @@ def Visualize(Matrix):
     
 #def main():
 
-#mp.dps = 16
+mp.dps = 15
 #print(mp) 
 ZERO = 10**(-16)
 
@@ -413,7 +433,7 @@ psi = thetap - theta
 nu = FindOptimizedVec(theta)
 
 Fq1 = FourierRecoveredPotential(nu.x, thetap, n)
-Fq2 = FourierPotential(q, a, psi, n)
+Fq2 = FourierPotential(q, a, psi)
 print("\nFourier transform of the recovered potential:", Fq1)
 print("Fourier transform of the actual potential q: ", Fq2)
 
