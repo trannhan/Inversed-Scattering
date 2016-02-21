@@ -1,16 +1,24 @@
 import scipy as sci
 from scipy import optimize, special
 import numpy as np
-import pylab as pl
+#import pylab as pl
 #import matplotlib
 import matplotlib.pyplot as plt 
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import cm, colors
 import cmath
+import math
 # For higher precision:
 #from mpmath import mp
 import time
 
+
+def doublefactorial(n):
+    if n <= 1:
+        return 1
+    else:
+        return n*doublefactorial(n-2)
+         
 
 #Convert a point alpha in C^3 to complex angles theta and phi
 def thetaphi(alpha):      
@@ -19,7 +27,7 @@ def thetaphi(alpha):
     
     phi = cmath.acos(alpha[2])
     theta = complex(np.pi/2)
-    sinphi = cmath.sin(phi)
+    sinphi = np.sin(phi)
     
     if(np.abs(sinphi) > ZERO):
         sintheta = alpha[1]/sinphi
@@ -29,9 +37,33 @@ def thetaphi(alpha):
             theta = cmath.atan(tantheta)
          
     return theta, phi
+
+
+#Compute the Associated Legendre polynomials (only depend on z, divided by sin(phi))
+#Equivalent to scipy.special.clpmn(m, n, z, type=2), but can take negative m, l
+#|m| <= l
+def P(l,m,z):
+    if(l<0):
+        return P(-l-1, m)
+    if(np.abs(m)>l):
+        return 0
+    if(m<0):
+        return ((-1)**m)*(math.factorial(l-m)/math.factorial(l+m))*P(l, -m, z)
     
+    if(l == 0) and (m==0):
+        return 1
+    if(l == m):
+        return ((-1)**m)*doublefactorial(2*m-1)*((1-z**2)**(m/2))
+    if(l-m==1):
+        return z*(2*m+1)*P(m, m, z)
+    
+    return (z*(2*l-1)*P(l-1, m, z) - (l+m-1)*P(l-2, m, z))/(l-m)
+        
     
 #Return the sum of spherical harmonic Y   
+#l: positive integer
+#theta: in [0, 2pi] 
+#phi: in [0, pi]
 def Y(l, theta, phi):     
     Yl = np.zeros((2*l+1,), dtype=np.complex)
     
@@ -39,7 +71,22 @@ def Y(l, theta, phi):
         Yl[m+l] = sci.special.sph_harm(m,l,theta,phi)
         #Yl += sci.special.sph_harm(m,l,theta,phi)
         
-    return np.sum(Yl)
+    return sum(Yl)
+    
+#Return the sum of spherical harmonic Y   
+#l: positive integer
+#theta, phi: complex angles
+def complexY(l, theta, phi):     
+    LP, DLP = sci.special.clpmn(l, l, cmath.cos(phi), type=2)
+    Yl = np.zeros((2*l+1,), dtype=np.complex)
+    
+    for m in np.arange(0,l+1):
+        Klm = (((-1)**m)*(1j**l)/math.sqrt(4*np.pi))*math.sqrt((2*l+1)*math.factorial(l-m)/math.factorial(l+m))
+        Yl[m+l] = Klm*cmath.exp(1j*m*theta)*LP[l,m]
+    for m in np.arange(-l,0):
+        Yl[m+l] = (-1)**(l+m)*np.conj(Yl[-m+l])
+        
+    return sum(Yl)    
     
     
 #Return a vector of the sum of spherical harmonic Y   
@@ -50,6 +97,18 @@ def Yvec(n, alpha):
     YY = np.zeros((n,), dtype=np.complex)
     for l in range(n):
         YY[l] = Y(l, theta, phi)    
+        
+    return YY
+    
+
+#Return a vector of the sum of spherical harmonic complexY   
+#n: the number of terms for approximation
+#alpha: vector in C^3
+def complexYvec(n, alpha):
+    theta, phi = thetaphi(alpha)
+    YY = np.zeros((n,), dtype=np.complex)
+    for l in range(n):
+        YY[l] = complexY(l, theta, phi)    
         
     return YY
 
@@ -63,7 +122,7 @@ def a0(alpha, n):
     theta, phi = thetaphi(alpha)
     
     for l in range(n):
-        a_0[l] = 4*np.pi*(1j**l)*np.conj(Y(l, theta, phi))
+        a_0[l] = 4*np.pi*(1j**l)*np.conj(complexY(l, theta, phi))
         
     return a_0
     
@@ -97,7 +156,7 @@ def ScatteringCoeff(alpha, a, kappa, n):
 #Al: Scattering coefficients of the scattering amplitude A
 #n: the number of terms for approximation
 def ScatteringAmplitude(beta, Al, n): 
-    return np.sum(Al*Yvec(n, beta))
+    return sum(Al*complexYvec(n, beta))
 
 
 #Compute the scattering amplitude
@@ -106,7 +165,7 @@ def A(beta, alpha, n):
     
     Al, Bl = ScatteringCoeff(alpha, a, kappa, n)
     
-    return np.sum(Al*Yvec(n, beta))    
+    return sum(Al*complexYvec(n, beta))    
     
     
 #Return the scattering solution at the point x with incident direction alpha   
@@ -119,7 +178,7 @@ def ScatteringSolution(x, alpha, Al, n):
     h, hp = special.sph_yn(n-1, r) #arrays of Bessel 2nd kind and its derivatives
 
     #Return u = incident field + scattered field
-    return cmath.exp(1j*np.dot(alpha, x)) + np.sum(Al*h*Yvec(n, x/r)) 
+    return cmath.exp(1j*np.dot(alpha, x)) + sum(Al*h*complexYvec(n, x/r)) 
 
 
 #Return an array of scattering solution at the point x with different incident 
@@ -132,11 +191,11 @@ def u(x, Alpha):
     r = np.linalg.norm(x)
     h, hp = special.sph_yn(n-1, r) #arrays of Bessel 2nd kind and its derivatives
 
-    hYY = h*Yvec(n, x/r)
+    hYY = h*complexYvec(n, x/r)
     
     U = np.zeros((n,), dtype=np.complex)
     for l in range(n):
-        U[l] = cmath.exp(1j*np.dot(Alpha[l,:], x)) + np.sum(AL[l]*hYY)        
+        U[l] = cmath.exp(1j*np.dot(Alpha[l,:], x)) + sum(AL[l]*hYY)        
     
     return U    
     
@@ -147,7 +206,7 @@ def fun(nu):
     
     ISum = 0
     for x in X:
-        ISum += np.abs(cmath.exp(-1j*np.dot(theta, x))*np.sum(u(x, Alpha)*nu)*delta-1)**2        
+        ISum += np.abs(cmath.exp(-1j*np.dot(theta, x))*sum(u(x, Alpha)*nu)*delta-1)**2        
         
     return ISum*deltaX
     
@@ -157,7 +216,7 @@ def fun(nu):
 def FindOptimizedVec(theta):
     global n
     
-    nu = np.zeros((n,), dtype=np.complex)
+    nu = np.zeros((n,))
     res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-16, 'disp': True})  #the best              
     #res = optimize.fmin_cg(fun, nu, gtol=1e-8)    
     #res = optimize.least_squares(fun, nu)
@@ -187,7 +246,7 @@ def FourierPotential(q, a, psi, n):
     global Alpha, numRadius
     
     #Create a grid for the ball B(a)
-    rootn = int(np.ceil(np.sqrt(n)))
+    rootn = int(math.ceil(math.sqrt(n))) 
     Ba = np.zeros(((rootn**2)*numRadius,3))
     AnnulusRadi = np.linspace(0, a, numRadius)
     l1 = 0
@@ -209,7 +268,7 @@ def ChooseThetaThetap(bigRealNum):
     v = bigRealNum/2
     w = -v
     b1 = 0
-    b2 = np.sqrt(w**2 - 1 - b1**2)
+    b2 = math.sqrt(w**2 - 1 - b1**2)
     theta = np.array([b1*1j, b2*1j, w], dtype=np.complex)
     thetap = np.array([b1*1j, b2*1j, v], dtype=np.complex)
  
@@ -259,8 +318,8 @@ def Visualize(Matrix):
     #ax.set_xticklabels(xlabels, fontsize=14)
     #ax.set_yticklabels(ylabels, fontsize=14)
     ax.set_title('$|A_l|$', fontsize=20)
-    ax.set_xlabel(r'$\boldsymbol \theta$', fontsize=20)
-    ax.set_ylabel(r'$\boldsymbol{\phi}$', fontsize=20)
+    ax.set_xlabel(r'$\theta$', fontsize=20)
+    ax.set_ylabel(r'$\phi$', fontsize=20)
     ax.grid()
     fig.colorbar(im, orientation='horizontal');  
       
@@ -276,10 +335,10 @@ ZERO = 10**(-16)
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 9
+n = 4
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
-a = 1.0
+a = 1
 print("Radius of a ball in R^3, a =", a)
 
 #Create an annulus X(a,b)
@@ -287,9 +346,9 @@ b = 1.2
 #Volume of the annulus X
 VolX = (4*np.pi/3)*(b**3-a**3)  
 #Divide the radius of the annulus from a->b into numRadius parts
-numRadius = 1
+numRadius = 2
 
-q = 3.0
+q = 3
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
@@ -316,7 +375,7 @@ print("Scattering solution at the point x, u =", uu, "\n")
 
 ################## Minimize to find vector nu ###################
 
-rootn = int(np.ceil(np.sqrt(n)))
+rootn = int(np.ceil(math.sqrt(n)))
 
 #Create a mesh on the sphere S^2
 Alpha = np.zeros((rootn**2,3), dtype=np.double)
@@ -348,7 +407,7 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**16)    
+theta, thetap = ChooseThetaThetap(10**27)    
 psi = thetap - theta
 
 nu = FindOptimizedVec(theta)
@@ -358,7 +417,7 @@ Fq2 = FourierPotential(q, a, psi, n)
 print("\nFourier transform of the recovered potential:", Fq1)
 print("Fourier transform of the actual potential q: ", Fq2)
 
-Visualize(AL)
+#Visualize(AL)
 
 Time = "\nTime elapsed: " + str(time.time()-startTime) + " seconds"
 print(Time)

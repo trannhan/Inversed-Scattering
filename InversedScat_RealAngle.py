@@ -1,7 +1,7 @@
 import scipy as sci
 from scipy import optimize, special
 import numpy as np
-import pylab as pl
+#import pylab as pl
 #import matplotlib
 import matplotlib.pyplot as plt 
 from mpl_toolkits.mplot3d import Axes3D
@@ -33,13 +33,16 @@ def thetaphi(alpha):
     
     
 #Return the sum of spherical harmonic Y   
+#l: positive integer
+#theta: in [0, 2pi] 
+#phi: in [0, pi]
 def Y(l, theta, phi):     
     Yl = np.zeros((2*l+1,), dtype=np.complex)
     
     for m in np.arange(-l,l+1):
         Yl[m+l] = sci.special.sph_harm(m,l,theta,phi)
         #Yl += sci.special.sph_harm(m,l,theta,phi)
-        
+    
     return np.sum(Yl)
     
     
@@ -188,7 +191,7 @@ def FourierPotential(q, a, psi, n):
     global Alpha, numRadius
     
     #Create a grid for the ball B(a)
-    rootn = int(np.ceil(np.sqrt(n)))
+    rootn = int(math.ceil(math.sqrt(n))) 
     Ba = np.zeros(((rootn**2)*numRadius,3))
     AnnulusRadi = np.linspace(0, a, numRadius)
     l1 = 0
@@ -260,8 +263,8 @@ def Visualize(Matrix):
     #ax.set_xticklabels(xlabels, fontsize=14)
     #ax.set_yticklabels(ylabels, fontsize=14)
     ax.set_title('$|A_l|$', fontsize=20)
-    ax.set_xlabel(r'$\boldsymbol \theta$', fontsize=20)
-    ax.set_ylabel(r'$\boldsymbol{\phi}$', fontsize=20)
+    ax.set_xlabel(r'$\theta$', fontsize=20)
+    ax.set_ylabel(r'$\phi$', fontsize=20)
     ax.grid()
     fig.colorbar(im, orientation='horizontal');  
       
@@ -277,7 +280,7 @@ ZERO = 10**(-16)
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 9
+n = 4
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1.0
@@ -317,7 +320,7 @@ print("Scattering solution at the point x, u =", uu, "\n")
 
 ################## Minimize to find vector nu ###################
 
-rootn = int(np.ceil(np.sqrt(n)))
+rootn = int(np.ceil(math.sqrt(n)))
 
 #Create a mesh on the sphere S^2
 Alpha = np.zeros((rootn**2,3), dtype=np.double)
@@ -359,7 +362,7 @@ Fq2 = FourierPotential(q, a, psi, n)
 print("\nFourier transform of the recovered potential:", Fq1)
 print("Fourier transform of the actual potential q: ", Fq2)
 
-Visualize(AL)
+#Visualize(AL)
 
 Time = "\nTime elapsed: " + str(time.time()-startTime) + " seconds"
 print(Time)
