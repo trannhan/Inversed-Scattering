@@ -186,7 +186,7 @@ def FourierRecoveredPotential(nu, thetap, n):
     return -4*np.pi*Fq*delta
     
 
-#Compute the Fourier transform of the potential q
+#Compute the Fourier transform of the potential q directly
 #psi = thetap-theta, |thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
 def FourierPotential1(q, a, psi, n):
@@ -209,15 +209,23 @@ def FourierPotential1(q, a, psi, n):
     return ISum*q*deltaBa
     
     
-#Compute the Fourier transform of the potential q
+#Compute the Fourier transform of the potential q using sympy
 #psi = thetap-theta, |thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
-def FourierPotential(q, a, psi):
+def FourierPotential2(q, a, psi):
     r, t, p = sp.symbols('r, t, p')
     f = sp.exp(-1j*r*(sp.cos(t)*sp.sin(p)*psi[0] + sp.sin(t)*sp.sin(p)*psi[1] + sp.cos(p)*psi[2]))*r*r*sp.sin(p)  
     I = sp.integrate(f, (r, 0, a), (t, 0, 2*sp.pi), (p, 0, sp.pi))
     
     return q*I
+    
+    
+#Compute the Fourier transform of the potential q analytically
+#psi = thetap-theta, |thetap| -> infinity
+#theta, thetap in M={z: z in C, z.z=1}
+def FourierPotential(q, a, psi):
+    t = np.linalg.norm(psi)
+    return ((4*np.pi*q)/(t**3))*(-t*a*np.cos(t*a)+np.sin(t*a))
     
     
 #|thetap| -> infinity
@@ -293,7 +301,7 @@ ZERO = 10**(-16)
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 10
+n = 9
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
@@ -365,15 +373,14 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**2)    
+theta, thetap = ChooseThetaThetap(10**8)
 psi = thetap - theta
 
 res = FindOptimizedVec(theta)
 
 Fq1 = FourierRecoveredPotential(res.x, thetap, n)
 print("\nFourier transform of the recovered potential:", Fq1)
-#Fq2 = FourierPotential(q, a, psi)
-Fq2 = 0
+Fq2 = FourierPotential(q, a, psi)
 print("Fourier transform of the actual potential q: ", Fq2)
 
 #Visualize(AL)
