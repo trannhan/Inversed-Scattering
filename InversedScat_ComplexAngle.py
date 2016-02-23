@@ -218,7 +218,7 @@ def fun(nu):
     ISum = 0
     for x in X:
         ISum +=  np.abs(np.exp(-1j*np.dot(theta, x))*sum(u(x, Alpha)*nu)*delta-1)**2
-        
+    
     return ISum*deltaX
     
     
@@ -357,7 +357,7 @@ ZERO = 10**(-16)
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 10
+n = 9
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
@@ -429,9 +429,8 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**2)    
+theta, thetap = ChooseThetaThetap(10)
 psi = thetap - theta
-
 res = FindOptimizedVec(theta)
 
 Fq1 = FourierRecoveredPotential(res.x, thetap, n)
