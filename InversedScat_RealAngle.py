@@ -42,7 +42,7 @@ def Y(l, theta, phi):
     Yl = np.zeros((2*l+1,), dtype=np.complex)
     
     for m in np.arange(-l,l+1):
-        Yl[m+l] = sci.special.sph_harm(m,l,theta,phi)
+        Yl[m+l] = sci.special.sph_harm(m,l,theta,phi) #Spherical harmonic
         #Yl += sci.special.sph_harm(m,l,theta,phi)
     
     return np.sum(Yl)
