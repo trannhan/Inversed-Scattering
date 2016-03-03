@@ -5,13 +5,13 @@ import numpy as np
 #import matplotlib
 import matplotlib.pyplot as plt 
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm, colors
+from matplotlib import cm
 import cmath
 import math
 import sympy as sp
-from sympy.mpmath import *
+#from sympy.mpmath import *
 # For higher precision:
-#from mpmath import mp
+from mpmath import mp
 import time
 
 
@@ -385,8 +385,7 @@ print("Fourier transform of the actual potential q: ", Fq2)
 
 #Visualize(AL)
 
-Time = "\nTime elapsed: " + str(time.time()-startTime) + " seconds"
-print(Time)
+print("\nTime elapsed:", time.time()-startTime,"seconds")
 
 #if __name__ == "__main__":
 #    main()

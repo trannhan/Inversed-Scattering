@@ -5,17 +5,19 @@ import numpy as np
 #import matplotlib
 import matplotlib.pyplot as plt 
 from mpl_toolkits.mplot3d import Axes3D
-from matplotlib import cm, colors
+from matplotlib import cm
 import cmath
 import math
 import sympy as sp
-from sympy.mpmath import *
+#from sympy.mpmath import *
 # For higher precision:
 #from mpmath import mp
 import time
+import numba as nb
 
 
 #Convert a point alpha in C^3 to complex angles theta and phi
+@nb.jit(target='cpu', cache=True)
 def thetaphi(alpha):       
     phi = cmath.acos(alpha[2])
     theta = complex(np.pi/2)
@@ -44,6 +46,7 @@ def Y(l, theta, phi):
         
     return sum(Yl)
     
+    
 #Return the sum of spherical harmonic Y   
 #l: positive integer
 #theta, phi: complex angles
@@ -55,7 +58,7 @@ def complexY(l, theta, phi):
         Klm = (((-1)**m)*(1j**l)/math.sqrt(4*np.pi))*math.sqrt((2*l+1)*math.factorial(l-m)/math.factorial(l+m))
         Yl[m+l] = Klm*np.exp(1j*m*theta)*LP[l,m]
     for m in np.arange(-l,0):
-        Yl[m+l] = (-1)**(l+m)*np.conj(Yl[-m+l])
+        Yl[m+l] = (-1)**(l+m)*np.conj(Yl[-m+l])        
         
     return sum(Yl)    
     
@@ -266,6 +269,7 @@ def ChooseThetaThetap(bigRealNum):
         
     
 ################## Visualize results ###################
+#@nb.jit(target='cpu', cache=True)
 def Visualize(Matrix):
     R = np.abs(Matrix)
     
@@ -318,7 +322,7 @@ def Visualize(Matrix):
     
 #def main():
 
-mp.dps = 15
+#mp.dps = 15
 #print(mp) 
 ZERO = 10**(-16)
 
@@ -409,8 +413,7 @@ print("Fourier transform of the actual potential q: ", Fq2)
 
 #Visualize(AL)
 
-Time = "\nTime elapsed: " + str(time.time()-startTime) + " seconds"
-print(Time)
-    
+print("\nTime elapsed:", time.time()-startTime,"seconds")
+
 #if __name__ == "__main__":
 #    main()
