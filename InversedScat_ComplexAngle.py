@@ -13,11 +13,11 @@ import sympy as sp
 # For higher precision:
 #from mpmath import mp
 import time
-import numba as nb
+#import numba as nb
 
 
 #Convert a point alpha in C^3 to complex angles theta and phi
-@nb.jit(target='cpu', cache=True)
+#@nb.jit(target='cpu', cache=True)
 def thetaphi(alpha):       
     phi = cmath.acos(alpha[2])
     theta = complex(np.pi/2)
@@ -55,10 +55,10 @@ def complexY(l, theta, phi):
     Yl = np.zeros((2*l+1,), dtype=np.complex)
     
     for m in np.arange(0,l+1):
-        Klm = (((-1)**m)*(1j**l)/math.sqrt(4*np.pi))*math.sqrt((2*l+1)*math.factorial(l-m)/math.factorial(l+m))
+        Klm = (((-1)**m)*(1j**l)/math.sqrt(4*np.pi))*math.sqrt((2*l+1)*np.math.factorial(l-m)/np.math.factorial(l+m))
         Yl[m+l] = Klm*np.exp(1j*m*theta)*LP[l,m]
     for m in np.arange(-l,0):
-        Yl[m+l] = (-1)**(l+m)*np.conj(Yl[-m+l])        
+        Yl[m+l] = (-1)**(l+m)*np.conjugate(Yl[-m+l])        
         
     return sum(Yl)    
     
@@ -96,7 +96,7 @@ def a0(alpha, n):
     theta, phi = thetaphi(alpha)
     
     for l in range(n):
-        a_0[l] = 4*np.pi*(1j**l)*np.conj(complexY(l, theta, phi))
+        a_0[l] = 4*np.pi*(1j**l)*np.conjugate(complexY(l, theta, phi))
         
     return a_0
     
