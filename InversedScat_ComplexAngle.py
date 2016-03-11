@@ -85,6 +85,17 @@ def complexYvec(n, alpha):
         YY[l] = complexY(l, theta, phi)    
         
     return YY
+    
+    
+def complexYMat(n, Alpha):
+    YY = np.zeros((n,Alpha.shape[0]), dtype=np.complex)
+    
+    for k in range(Alpha.shape[0]):
+        theta, phi = thetaphi(Alpha[k,:])
+        for l in range(n):
+            YY[l,k] = complexY(l, theta, phi)    
+            
+    return YY
 
 
 #Return coefficients a0 in the series of e^{i*alpha.x}
@@ -176,11 +187,16 @@ def u(x, Alpha):
     
 #Define the scattering function that needs to be minimized    
 def fun(nu):
-    global theta, X, delta, deltaX, Alpha
+    global n, theta, X, delta, deltaX, Alpha
     
     ISum = 0
     for x in X:
-        ISum +=  np.abs(np.exp(-1j*np.dot(theta, x))*sum(u(x, Alpha)*nu)*delta-1)**2
+        UU = u(x, Alpha)
+        coef = np.exp(-1j*np.dot(theta, x))
+        Sum = 0
+        for l in range(n):
+            Sum += nu[l]*sum(UU*YMat[l,:])            
+        ISum +=  np.abs(coef*Sum*delta-1)**2
     
     return ISum*deltaX
     
@@ -204,11 +220,13 @@ def FindOptimizedVec(theta):
 #theta, thetap in M={z: z in C, z.z=1}
 def FourierRecoveredPotential(nu, thetap, n):
     global Alpha
+    Nu = np.zeros((n,), dtype=complex)
     
     delta = (4*np.pi)/n         #infinitesimal of S^2, unit sphere
     Fq = 0
     for l in range(n):
-        Fq += A(thetap, Alpha[l,:], n)*nu[l]
+        Nu[l] = sum(nu*YMat[:,l])
+        Fq += A(thetap, Alpha[l,:], n)*Nu[l]
     
     return -4*np.pi*Fq*delta
     
@@ -329,7 +347,7 @@ ZERO = 10**(-16)
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 9
+n = 4
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
@@ -401,13 +419,15 @@ deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**8)
+theta, thetap = ChooseThetaThetap(10**4)
 psi = thetap - theta
+YMat = complexYMat(n, Alpha)
 
 res = FindOptimizedVec(theta)
+print("\nVector nu =",res.x)
 
 Fq1 = FourierRecoveredPotential(res.x, thetap, n)
-print("\nFourier transform of the recovered potential:", Fq1)
+print("Fourier transform of the recovered potential:", Fq1)
 Fq2 = FourierPotential(q, a, psi)
 print("Fourier transform of the actual potential q: ", Fq2)
 
