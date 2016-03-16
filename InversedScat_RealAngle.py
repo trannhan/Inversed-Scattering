@@ -60,6 +60,17 @@ def Yvec(n, alpha):
     return YY
 
 
+def YMat(n, Alpha):
+    YY = np.zeros((n,Alpha.shape[0]), dtype=np.complex)
+    
+    for k in range(Alpha.shape[0]):
+        theta, phi = thetaphi(Alpha[k,:])
+        for l in range(n):
+            YY[l,k] = Y(l, theta, phi)    
+            
+    return YY
+
+
 #Return coefficients a0 in the series of e^{i*alpha.x}
 #alpha: unit vector
 #n: the number of terms for approximation
@@ -140,8 +151,8 @@ def u(x, Alpha):
 
     hYY = h*Yvec(n, x/r)
     
-    U = np.zeros((n,), dtype=np.complex)
-    for l in range(n):
+    U = np.zeros((Alpha.shape[0],), dtype=np.complex)
+    for l in range(Alpha.shape[0]):
         U[l] = np.exp(1j*np.dot(Alpha[l,:], x)) + sum(AL[l]*hYY)        
     
     return U    
@@ -149,11 +160,16 @@ def u(x, Alpha):
     
 #Define the scattering function that needs to be minimized    
 def fun(nu):
-    global theta, X, delta, deltaX, Alpha
+    global n, theta, X, delta, deltaX, Alpha, YMat
     
     ISum = 0
     for x in X:
-        ISum +=  np.abs(np.exp(-1j*np.dot(theta, x))*sum(u(x, Alpha)*nu)*delta-1)**2
+        UU = u(x, Alpha)
+        coef = np.exp(-1j*np.dot(theta, x))
+        Sum = 0
+        for l in range(n):
+            Sum += nu[l]*sum(UU*YMat[l,:])            
+        ISum +=  np.abs(coef*Sum*delta-1)**2
         
     return ISum*deltaX
     
@@ -171,30 +187,75 @@ def FindOptimizedVec(theta):
     return res
  
 
+#Return the integral over S^2 of u*Y_l 
+#X: the annulus(a1,b)
+def p(l,X):
+    global Alpha, YMat, delta
+    
+    P = np.zeros((X.shape[0],), dtype=complex)
+
+    for i in range(X.shape[0]):
+        P[i] = sum(u(X[i], Alpha)*YMat[l,:])
+        
+    return P*delta
+ 
+
+#Optimize using quadratic form 
+def Optimize(theta):
+    global n, X, deltaX
+    B = np.zeros((n,n), dtype=complex)
+    P = np.zeros((n,X.shape[0]), dtype=complex)
+    RHS = np.zeros((n,), dtype=complex)
+    E = np.zeros((X.shape[0],), dtype=complex)    
+    
+    for l in range(n):
+        P[l,:] = p(l,X)
+        
+    for i in range(n):
+        for j in range(n):
+            B[i,j] = sum(np.conjugate(P[j,:])*P[i,:])
+    B *= deltaX
+    
+    for i in range(X.shape[0]):
+        E[i] = np.exp(-1j*np.dot(theta,X[i]))
+    
+    for i in range(n):
+        RHS[i] = sum(E*P[i,:])
+    RHS *= deltaX
+        
+    nu = sci.linalg.solve(np.real(B),np.real(RHS))
+    
+    return nu
+    
+    
 #Compute the Fourier transform of the recovered potential
 #nu: optimized vector
 #|thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
 def FourierRecoveredPotential(nu, thetap, n):
     global Alpha
+    Nu = np.zeros((Alpha.shape[0],), dtype=complex)
     
     delta = (4*np.pi)/n         #infinitesimal of S^2, unit sphere
     Fq = 0
-    for l in range(n):
-        Fq += A(thetap, Alpha[l,:], n)*nu[l]
+    for l in range(Alpha.shape[0]):
+        Nu[l] = sum(nu*YMat[:,l])
+        #Nu[l] = sum(nu*complexYvec(n,Alpha[l,:]))
+        Fq += A(thetap, Alpha[l,:], n)*Nu[l]
     
+    print("Vector nu =\n", Nu)
     return -4*np.pi*Fq*delta
     
 
 #Compute the Fourier transform of the potential q directly
 #psi = thetap-theta, |thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
-def FourierPotential1(q, a, psi, n):
-    global Alpha, numRadius
+def FourierPotential1(q, a, psi):
+    global Alpha, numRadius, n
     
     #Create a grid for the ball B(a)
-    rootn = int(math.ceil(math.sqrt(n))) 
-    Ba = np.zeros(((rootn**2)*numRadius,3))
+    rootn = int(np.round(math.sqrt(n))) 
+    Ba = np.zeros(((rootn**2)*numRadius,3), dtype=np.double)
     AnnulusRadi = np.linspace(0, a, numRadius)
     l1 = 0
     for R in AnnulusRadi: 
@@ -294,39 +355,38 @@ def Visualize(Matrix):
     
 #def main():
 
-mp.dps = 15
+#mp.dps = 15
 #print(mp) 
 ZERO = 10**(-16)
 
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 9
+n = 16
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
 print("Radius of a ball in R^3, a =", a)
-
-#Create an annulus X(a,b)
+a1 = a*1.1
+#Create an annulus X(a1,b)
 b = 1.2
 #Volume of the annulus X
-VolX = (4*np.pi/3)*(b**3-a**3)  
+VolX = (4*np.pi/3)*(b**3-a1**3)  
 #Divide the radius of the annulus from a->b into numRadius parts
-numRadius = 1
+numRadius = 2
 
 q = 3
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
-theta, phi = np.pi/2, np.pi/2
-alpha = np.array([np.cos(theta)*np.sin(phi),np.sin(theta)*np.sin(phi),np.cos(phi)])
-print("Direction of the incident field, alpha =", alpha)
+alpha = [1,0,0]
+print("Incident field direction, alpha =", alpha)
 
-x = np.array([1,1,1], dtype=np.double)
+x = [1,1,1]
 print("A point in R^3, x =", x)
 
 beta = x/np.linalg.norm(x)
-print("Unit vector in the direction of x, beta =", beta)
+print("Direction of x, beta =", beta)
 
 ################ Create sample scattering data ##################
 
@@ -341,7 +401,7 @@ print("Scattering solution at the point x, u =", uu, "\n")
 
 ################## Minimize to find vector nu ###################
 
-rootn = int(np.ceil(math.sqrt(n)))
+rootn = int(np.round(math.sqrt(n)))
 
 #Create a mesh on the sphere S^2
 Alpha = np.zeros((rootn**2,3), dtype=np.double)
@@ -352,9 +412,9 @@ for l1 in range(rootn):
         index = l1*rootn + l2
         Alpha[index] = np.array([np.cos(Theta[l1])*np.sin(Phi[l2]),np.sin(Theta[l1])*np.sin(Phi[l2]),np.cos(Phi[l2])])
 
-#Create a grid for the annulus X(a,b)
+#Create a grid for the annulus X(a1>a,b)
 X = np.zeros(((rootn**2)*numRadius,3), dtype=np.double)
-AnnulusRadi = np.linspace(a*1.1, b, numRadius)
+AnnulusRadi = np.linspace(a1, b, numRadius)
 l1 = 0
 for R in AnnulusRadi: 
     X[l1:l1+Alpha.shape[0]] = Alpha*R
@@ -362,26 +422,29 @@ for R in AnnulusRadi:
 
 #Compute the coefficients of wave scattering solution corresponding to different
 #directions of incident wave
-AL = np.zeros((n,n), dtype=np.complex)
-BL = np.zeros((n,n), dtype=np.complex)
-for l1 in range(n):
-    AL[l1], BL[l1] = ScatteringCoeff(Alpha[l1,:], a, kappa, n)
+AL = np.zeros((Alpha.shape[0],n), dtype=np.complex)
+BL = np.zeros((Alpha.shape[0],n), dtype=np.complex)
+for l in range(Alpha.shape[0]):
+    AL[l], BL[l] = ScatteringCoeff(Alpha[l,:], a, kappa, n)
         
 #Infinitesimals for computing the surface and volume integrals in fun()        
 delta = (4*np.pi)/n         #infinitesimal of S^2, unit sphere
-deltaX = VolX/X.shape[0]    #infinitesimal of X(a,b), the annulus
+deltaX = VolX/X.shape[0]    #infinitesimal of X(a1,b), the annulus
 
 #theta, thetap in M={z: z in C, z.z=1}
 #psi = thetap-theta, |thetap| -> infinity
-theta, thetap = ChooseThetaThetap(10**8)
+theta, thetap = ChooseThetaThetap(10**3)
 psi = thetap - theta
+YMat = YMat(n, Alpha)
 
-res = FindOptimizedVec(theta)
+#res = FindOptimizedVec(theta)
+#Fq1 = FourierRecoveredPotential(res.x, thetap, n)
 
-Fq1 = FourierRecoveredPotential(res.x, thetap, n)
-print("\nFourier transform of the recovered potential:", Fq1)
-Fq2 = FourierPotential(q, a, psi)
-print("Fourier transform of the actual potential q: ", Fq2)
+nu = Optimize(theta)
+Fq1 = FourierRecoveredPotential(nu, thetap, n)
+print("Fourier(recovered potential):", Fq1)
+Fq2 = FourierPotential1(q, a, psi)
+print("Fourier(actual potential q) :", Fq2)
 
 #Visualize(AL)
 
