@@ -54,6 +54,7 @@ def complexY(l, theta, phi):
     LP, DLP = sci.special.clpmn(l, l, np.cos(phi), type=2) #Legendre poly
     Yl = np.zeros((2*l+1,), dtype=np.complex)
     
+    #Compute Spherical harmonic for wave scattering:
     for m in np.arange(0,l+1):
         Klm = (((-1)**m)*(1j**l)/math.sqrt(4*np.pi))*math.sqrt((2*l+1)*np.math.factorial(l-m)/np.math.factorial(l+m))
         Yl[m+l] = Klm*np.exp(1j*m*theta)*LP[l,m]
@@ -121,7 +122,7 @@ def ScatteringCoeff(alpha, a, kappa, n):
     Al = np.zeros((n,), dtype=np.complex)
     Bl = np.zeros((n,), dtype=np.complex)    
     AA = np.zeros((2,2), dtype=np.complex)
-    
+
     j, jp = special.sph_jn(n-1, kappa*a) #array of Bessel 1st kind and its derivatives
     h, hp = special.sph_yn(n-1, a)       #arrays of Bessel 2nd kind and its derivatives
     a_0 = a0(alpha, n)
@@ -129,7 +130,7 @@ def ScatteringCoeff(alpha, a, kappa, n):
     for l in range(n):
         AA[0,0], AA[0,1] = j[l], -h[l]       
         AA[1,0], AA[1,1] = kappa*jp[l], -hp[l]        
-        RHS = np.array([a_0[l]*j[l], a_0[l]*jp[l]])  
+        RHS = [a_0[l]*j[l], a_0[l]*jp[l]] 
         x = sci.linalg.solve(AA,RHS)        
         Al[l], Bl[l] = x[0], x[1]
 
@@ -271,6 +272,7 @@ def FourierRecoveredPotential(nu, thetap, n):
         Fq += A(thetap, Alpha[l,:], n)*Nu[l]
     
     print("Vector nu =\n", Nu)
+    
     return -4*np.pi*Fq*delta
     
 
