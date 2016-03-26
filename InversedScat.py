@@ -1,9 +1,11 @@
 import scipy as sci
-from scipy import special
-from scipy.fftpack import fft, ifft
+from scipy import optimize, special
 import numpy as np
 #import pylab as pl
 #import matplotlib
+import matplotlib.pyplot as plt 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
 import cmath
 import math
 import time
@@ -110,8 +112,7 @@ def a0(alpha, n):
 #kappa: 1-q, q is the potential in Shcrodinger operator: Laplace+1-q
 #n: the number of terms for approximation
 def ScatteringCoeff(alpha, a, kappa, n):
-    Al = np.zeros((n,), dtype=np.complex)
-    Bl = np.zeros((n,), dtype=np.complex)    
+    Al = np.zeros((n,), dtype=np.complex) 
     AA = np.zeros((2,2), dtype=np.complex)
 
     j, jp = special.sph_jn(n-1, kappa*a) #array of Bessel 1st kind and its derivatives
@@ -123,16 +124,16 @@ def ScatteringCoeff(alpha, a, kappa, n):
         AA[1,0], AA[1,1] = kappa*jp[l], -hp[l]        
         RHS = [a_0[l]*j[l], a_0[l]*jp[l]] 
         x = sci.linalg.solve(AA,RHS)        
-        Al[l], Bl[l] = x[0], x[1]
+        Al[l] = x[1]
 
-    return Al, Bl
+    return Al
 
 
 #Compute the scattering amplitude
 def A(beta, alpha, n): 
     global a, kappa
     
-    Al, Bl = ScatteringCoeff(alpha, a, kappa, n)
+    Al = ScatteringCoeff(alpha, a, kappa, n)
     
     return sum(Al*complexYvec(n, beta))    
     
@@ -159,8 +160,6 @@ def u(x, Alpha):
 #Define the scattering function that needs to be minimized    
 def fun(nu):
     global n, theta, X, Alpha, YMat
-    deltaX = VolX/X.shape[0]  #infinitesimal of X(a1,b), the annulus
-    delta = (pi4)/n           #infinitesimal of S^2, unit sphere
     
     ISum = 0
     for x in X:
@@ -172,6 +171,19 @@ def fun(nu):
         ISum +=  np.abs(coef*Sum*delta-1)**2
     
     return ISum*deltaX    
+    
+
+#Minimize fun in the annulus a<x<b, x in R^3    
+#theta, thetap in M={z: z in C, z.z=1}
+def Optimize(theta):
+    global n
+    
+    nu = np.random.rand(n,1)
+    res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-3, 'disp': True})  #the best              
+    #res = optimize.fmin_cg(fun, nu, gtol=1e-4)    
+    #res = optimize.least_squares(fun, nu)
+    
+    return res.x
     
 
 #Return the integral over S^2 of u*Y_l 
@@ -188,7 +200,7 @@ def p(l,X):
  
 
 #Optimize using quadratic form 
-def Optimize(theta):
+def Optimize1(theta):
     global n, X
     B = np.zeros((n,n), dtype=complex)
     P = np.zeros((n,X.shape[0]), dtype=complex)
@@ -231,7 +243,7 @@ def FourierRecoveredPotential(nu, thetap, n):
         #Nu[l] = sum(nu*complexYvec(n,Alpha[l,:]))
         Fq += A(thetap, Alpha[l,:], n)*Nu[l]
     
-    print("Vector nu =\n", Nu)
+    print("Vector Nu =\n", Nu)
     
     return -pi4*Fq*delta
     
@@ -279,6 +291,56 @@ def ChooseThetaThetap(bigRealNum):
     return theta, thetap
         
 
+################## Visualize results ###################
+#@nb.jit(target='cpu', cache=True)
+def Visualize(Matrix):
+    R = np.abs(Matrix)
+    
+    ############## Cartesian plot ##############
+    Theta = np.linspace(0, 2*np.pi, n)
+    Phi = np.linspace(0, np.pi, n)
+    PHI, THETA = np.meshgrid(Phi, Theta)
+    
+    X1 = R * np.sin(PHI) * np.cos(THETA)
+    X2 = R * np.sin(PHI) * np.sin(THETA)
+    X3 = R * np.cos(PHI)
+    
+    N = R/R.max()
+    
+    #matplotlib.rc('text', usetex=True)
+    #matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'), figsize=(12,10))
+    im = ax.plot_surface(X1, X2, X3, rstride=1, cstride=1, facecolors=cm.jet(N))
+    ax.set_title(r'$|A_l|$', fontsize=20)
+    m = cm.ScalarMappable(cmap=cm.jet)
+    m.set_array(R)    # Assign the unnormalized data array to the mappable
+                      #so that the scale corresponds to the values of R
+    fig.colorbar(m, shrink=0.8);
+    
+    ############## Spherical plot ##############
+    # Coordinate arrays for the graphical representation
+    x = np.linspace(-np.pi, np.pi, n)
+    y = np.linspace(-np.pi/2, np.pi/2, n)
+    X, Y = np.meshgrid(x, y)
+    
+    # Spherical coordinate arrays derived from x, y
+    # Necessary conversions to get Mollweide right
+    theta = x.copy()    # physical copy
+    theta[x < 0] = 2 * np.pi + x[x<0]
+    phi = np.pi/2 - y
+    PHI, THETA = np.meshgrid(phi, theta)
+    
+    fig, ax = plt.subplots(subplot_kw=dict(projection='mollweide'), figsize=(10,8))
+    im = ax.pcolormesh(X, Y , R)
+    #ax.set_xticklabels(xlabels, fontsize=14)
+    #ax.set_yticklabels(ylabels, fontsize=14)
+    ax.set_title('$|A_l|$', fontsize=20)
+    ax.set_xlabel(r'$\theta$', fontsize=20)
+    ax.set_ylabel(r'$\phi$', fontsize=20)
+    ax.grid()
+    fig.colorbar(im, orientation='horizontal');  
+      
+    
 ########################## MAIN FUNCTION ###########################  
     
 #def main():
@@ -291,7 +353,7 @@ pi4 = 4*np.pi
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 36
+n = 16
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
@@ -302,7 +364,7 @@ b = 1.2
 #Volume of the annulus X
 VolX = (pi4/3)*(b**3-a1**3)  
 #infinitesimal of S^2, unit sphere
-delta = pi4/n
+delta = pi4/n 
 #Divide the radius of the annulus from a->b into numRadius parts
 numRadius = 1
 
@@ -319,7 +381,6 @@ print("A point in R^3, x =", x)
 beta = x/np.linalg.norm(x)
 print("Direction of x, beta =", beta)
 
-################## Minimize to find vector nu ###################
 mphi = 3
 cphi = np.pi/(mphi+1)
 #Create a mesh on the sphere S^2
@@ -338,13 +399,15 @@ i = 0
 for R in AnnulusRadi: 
     X[i:i+Alpha.shape[0]] = Alpha*R
     i += Alpha.shape[0]
+    
+#infinitesimal of X(a1,b), the annulus    
+deltaX = VolX/X.shape[0] 
 
 #Compute the coefficients of wave scattering solution corresponding to different
 #directions of incident wave
 AL = np.zeros((Alpha.shape[0],n), dtype=np.complex)
-BL = np.zeros((Alpha.shape[0],n), dtype=np.complex)
 for l in range(Alpha.shape[0]):
-    AL[l], BL[l] = ScatteringCoeff(Alpha[l,:], a, kappa, n)
+    AL[l] = ScatteringCoeff(Alpha[l,:], a, kappa, n)
 
 ################ Create sample scattering data ##################
 
@@ -354,8 +417,10 @@ print("\nOUTPUTS:\nScattering amplitude at the point x, A =", AA)
 uu = u(x, Alpha)
 print("Scattering solution at the point x, u =\n", uu, "\n")
 
+################## Minimize to find vector nu ###################
+
 #theta, thetap in M={z: z in C, z.z=1}
-theta, thetap = ChooseThetaThetap(10**3)
+theta, thetap = ChooseThetaThetap(10)
 psi = thetap - theta
 YMat = complexYMat(n, Alpha)
 
@@ -364,6 +429,8 @@ Fq1 = FourierRecoveredPotential(nu, thetap, n)
 print("\nFourier(recovered potential):", Fq1)
 Fq2 = FourierPotential1(q, a, psi)
 print("Fourier(actual potential q) :", Fq2)
+
+#Visualize(AL)
 
 print("\nTime elapsed:", time.time()-startTime,"seconds")
 
