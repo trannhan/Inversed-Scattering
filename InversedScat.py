@@ -353,7 +353,7 @@ pi4 = 4*np.pi
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 16
+n = 20
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
