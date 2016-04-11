@@ -123,7 +123,8 @@ def ScatteringCoeff(alpha, a, kappa, n):
         AA[0,0], AA[0,1] = j[l], -h[l]       
         AA[1,0], AA[1,1] = kappa*jp[l], -hp[l]        
         RHS = [a_0[l]*j[l], a_0[l]*jp[l]] 
-        x = sci.linalg.solve(AA,RHS)        
+        #x = sci.linalg.solve(AA,RHS)   
+        x, info = sci.sparse.linalg.gmres(AA,RHS)   
         Al[l] = x[1]
 
     return Al
@@ -179,6 +180,7 @@ def Optimize(theta):
     global n
     
     nu = np.random.rand(n,1)
+    #nu = np.ones((n,1))
     res = optimize.minimize(fun, nu, method='BFGS', options={'gtol':1e-3, 'disp': True})  #the best              
     #res = optimize.fmin_cg(fun, nu, gtol=1e-4)    
     #res = optimize.least_squares(fun, nu)
@@ -236,7 +238,7 @@ def FourierRecoveredPotential(nu, thetap, n):
     global Alpha
     Nu = np.zeros((Alpha.shape[0],), dtype=complex)
     
-    delta = (pi4)/n         #infinitesimal of S^2, unit sphere
+    #delta = (pi4)/Alpha.shape[0]   #infinitesimal of S^2, unit sphere
     Fq = 0
     for l in range(Alpha.shape[0]):
         Nu[l] = sum(nu*YMat[:,l])
@@ -256,13 +258,13 @@ def FourierPotential1(q, a, psi):
     
     #Create a grid for the ball B(a)
     Ba = np.zeros((Alpha.shape[0]*numRadius,3), dtype=np.double)
-    AnnulusRadi = np.linspace(0, a, numRadius)
+    AnnulusRadi = np.linspace(a/10, a, numRadius)
     i = 0
     for R in AnnulusRadi: 
         Ba[i:i+Alpha.shape[0]] = Alpha*R
         i += Alpha.shape[0]
     
-    deltaBa = (pi4*a**3)/(3*Ba.shape[0])
+    deltaBa = (pi4*(a**3))/(3*Ba.shape[0])
     ISum = 0    
     for y in Ba:
         ISum += np.exp(-1j*np.dot(psi,y))
@@ -353,7 +355,7 @@ pi4 = 4*np.pi
 startTime = time.time()     
 
 ################ Setting up input parameters ##################
-n = 20
+n = 9
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
 a = 1
@@ -363,12 +365,10 @@ a1 = a*1.1
 b = 1.2
 #Volume of the annulus X
 VolX = (pi4/3)*(b**3-a1**3)  
-#infinitesimal of S^2, unit sphere
-delta = pi4/n 
 #Divide the radius of the annulus from a->b into numRadius parts
 numRadius = 1
 
-q = 3
+q = 500
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
@@ -391,6 +391,9 @@ for i in range(mphi):
     for j in range(mtheta):
         theta = j*pi2/mtheta
         Alpha = np.vstack((Alpha, np.array([np.cos(theta)*np.sin(phi),np.sin(theta)*np.sin(phi),np.cos(phi)])))
+
+#infinitesimal of S^2, unit sphere
+delta = pi4/Alpha.shape[0]
 
 #Create a grid for the annulus X(a1>a,b)
 X = np.zeros((Alpha.shape[0]*numRadius,3),dtype=np.double)
@@ -420,15 +423,17 @@ print("Scattering solution at the point x, u =\n", uu, "\n")
 ################## Minimize to find vector nu ###################
 
 #theta, thetap in M={z: z in C, z.z=1}
-theta, thetap = ChooseThetaThetap(10)
+theta, thetap = ChooseThetaThetap(16)
 psi = thetap - theta
 YMat = complexYMat(n, Alpha)
 
 nu = Optimize(theta)
 Fq1 = FourierRecoveredPotential(nu, thetap, n)
 print("\nFourier(recovered potential):", Fq1)
-Fq2 = FourierPotential1(q, a, psi)
+Fq2 = FourierPotential(q, a, psi)
 print("Fourier(actual potential q) :", Fq2)
+error = np.abs(Fq1-Fq2)/np.abs(Fq2);
+print("Relative error:", error)
 
 #Visualize(AL)
 
