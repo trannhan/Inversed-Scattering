@@ -10,18 +10,18 @@ import cmath
 import math
 import time
 
-
+#alpha=(cos(theta)sin(phi), sin(theta)sin(phi), cos(phi))
 def thetaphi(alpha):       
     phi = cmath.acos(alpha[2])
     theta = complex(pi_2)
     sinphi = np.sin(phi)
-
-    if(np.abs(sinphi) > ZERO):
+    
+    if(sinphi != 0):
         sintheta = alpha[1]/sinphi
+        theta = cmath.asin(sintheta)
         costheta = alpha[0]/sinphi
-        if(np.abs(costheta) > ZERO):
-            tantheta = sintheta/costheta
-            theta = cmath.atan(tantheta)
+        if(costheta < 0):            
+            theta += np.pi 
          
     return theta, phi
 
@@ -123,8 +123,8 @@ def ScatteringCoeff(alpha, a, kappa, n):
         AA[0,0], AA[0,1] = j[l], -h[l]       
         AA[1,0], AA[1,1] = kappa*jp[l], -hp[l]        
         RHS = [a_0[l]*j[l], a_0[l]*jp[l]] 
-        #x = sci.linalg.solve(AA,RHS)   
-        x, info = sci.sparse.linalg.gmres(AA,RHS)   
+        x = sci.linalg.solve(AA,RHS)   
+        #x, info = sci.sparse.linalg.gmres(AA,RHS)   
         Al[l] = x[1]
 
     return Al
@@ -160,12 +160,12 @@ def u(x, Alpha):
     
 #Define the scattering function that needs to be minimized    
 def fun(nu):
-    global n, theta, X, Alpha, YMat
+    global n, Theta, X, Alpha, YMat
     
     ISum = 0
     for x in X:
         UU = u(x, Alpha)
-        coef = np.exp(-1j*np.dot(theta, x))
+        coef = np.exp(-1j*np.dot(Theta, x))
         Sum = 0
         for l in range(n):
             Sum += nu[l]*sum(UU*YMat[l,:])            
@@ -226,6 +226,7 @@ def Optimize1(theta):
     RHS *= deltaX
         
     nu = sci.linalg.solve(np.real(B),np.real(RHS))
+    print("Optimized function value fun =", fun(nu))
     
     return nu
     
@@ -282,15 +283,14 @@ def FourierPotential(q, a, psi):
     
 #|thetap| -> infinity
 #theta, thetap in M={z: z in C, z.z=1}
-def ChooseThetaThetap(bigRealNum):
-    v = bigRealNum/2
-    w = -v
-    b1 = 0
-    b2 = np.sqrt(w**2 - 1 - b1**2)
-    theta = np.array([b1*1j, b2*1j, w], dtype=np.complex)
-    thetap = np.array([b1*1j, b2*1j, v], dtype=np.complex)
+def ChooseThetaThetapPsi(bigRealNum):
+    Psi = np.array([0,0,1.5])
+    theta = np.complex(bigRealNum,1)
+    phi = theta
+    Thetap = np.array([np.cos(theta)*np.sin(phi),np.sin(theta)*np.sin(phi),np.cos(phi)])
+    Theta = Thetap - Psi
  
-    return theta, thetap
+    return Theta, Thetap, Psi
         
 
 ################## Visualize results ###################
@@ -358,7 +358,7 @@ startTime = time.time()
 n = 9
 print("\nINPUTS:\nThe number of terms that approximate the scattering solution, n =", n)
 
-a = 1
+a = 0.1
 print("Radius of a ball in R^3, a =", a)
 a1 = a*1.1
 #Create an annulus X(a1,b)
@@ -366,16 +366,16 @@ b = 1.2
 #Volume of the annulus X
 VolX = (pi4/3)*(b**3-a1**3)  
 #Divide the radius of the annulus from a->b into numRadius parts
-numRadius = 1
+numRadius = 2
 
-q = 500
+q = 50
 print("The potential in Shcrodinger operator (Laplace+1-q), q =", q)
 kappa = 1 - q
 
-alpha = [1,0,0]
+alpha = np.array([1,0,0])
 print("Incident field direction, alpha =", alpha)
 
-x = [1,0,0]
+x = np.array([1,0,0])
 print("A point in R^3, x =", x)
 
 beta = x/np.linalg.norm(x)
@@ -423,14 +423,13 @@ print("Scattering solution at the point x, u =\n", uu, "\n")
 ################## Minimize to find vector nu ###################
 
 #theta, thetap in M={z: z in C, z.z=1}
-theta, thetap = ChooseThetaThetap(16)
-psi = thetap - theta
+Theta, Thetap, Psi = ChooseThetaThetapPsi(10**111)
 YMat = complexYMat(n, Alpha)
 
-nu = Optimize(theta)
-Fq1 = FourierRecoveredPotential(nu, thetap, n)
+nu = Optimize1(Theta)
+Fq1 = FourierRecoveredPotential(nu, Thetap, n)
 print("\nFourier(recovered potential):", Fq1)
-Fq2 = FourierPotential(q, a, psi)
+Fq2 = FourierPotential(q, a, Psi)
 print("Fourier(actual potential q) :", Fq2)
 error = np.abs(Fq1-Fq2)/np.abs(Fq2);
 print("Relative error:", error)
