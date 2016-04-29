@@ -4,6 +4,10 @@ import numpy as np
 import cmath
 import math
 import time
+import matplotlib.pyplot as plt 
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib import cm
+import sympy as sp
 
 #alpha=(cos(theta)sin(phi), sin(theta)sin(phi), cos(phi)): unit vectors
 def thetaphi(alpha):       
@@ -14,13 +18,14 @@ def thetaphi(alpha):
     if(sinphi != 0):
         sintheta = alpha[1]/sinphi
         theta = cmath.asin(sintheta)
-        if(alpha[0]/sinphi < 0):            
+        if(alpha[0]/sinphi < 0):   #cos(theta)<0         
             theta = np.pi-theta 
          
     return theta, phi
     
     
-#Return a vector of spherical harmonic Y   
+#Return a vector of spherical harmonic Y
+#Different from sci.special.sph_harm(m,l,theta,phi) which takes only real angles
 #l: positive integer
 #theta, phi: complex angles
 def complexY(l, theta, phi):     
@@ -39,6 +44,7 @@ def complexY(l, theta, phi):
     return Yl
     
 
+#Return a matrix of spherical harmonic Y for 0<=l<n
 def complexYMat(theta, phi):
     global n
     YY = np.zeros((n,2*n+1), dtype=np.complex)
@@ -50,7 +56,7 @@ def complexYMat(theta, phi):
     return YY
     
     
-#Create a cube Y(alpha,l,m) 
+##Return a cube of spherical harmonic Y for all alpha in S^2
 #Alpha must contain unit vectors
 def complexYCube(Alpha):
     global n
@@ -103,20 +109,21 @@ def A(beta, alpha):
     return np.sum(Al*complexYMat(theta, phi))
 
 
+#Compute the incoming wave
 def IncidentField(Alpha, X):
     global k
     u0 = np.zeros((Alpha.shape[0],X.shape[0]), dtype=np.complex)
     
     for l in range(Alpha.shape[0]):
         for i in range(X.shape[0]): 
-            u0[l,i] = np.exp(1j*np.dot(Alpha[l,:], X[i]))
+            u0[l,i] = np.exp(1j*k*np.dot(Alpha[l,:], X[i]))
             
     return u0
     
 
 #Return scattering solution at the point x with incident direction alpha
 #x: a point in R^3   
-#alpha: incident directions 
+#alpha: incident directions, unit vector 
 def TotalField(x, alpha):
     global n
     r = np.linalg.norm(x)
@@ -124,11 +131,19 @@ def TotalField(x, alpha):
     theta, phi = thetaphi(x/r) 
     
     YY = complexYMat(theta, phi)  
-    U = np.exp(1j*k*np.dot(alpha, x)) + np.sum(h*np.sum(ScatteringCoeff(alpha)*YY,axis=1))
+    U = np.exp(1j*k*np.dot(alpha, x))
+    #return Total Field = Incident Field + Scattered Field
+    return U + np.sum(h*np.sum(ScatteringCoeff(alpha)*YY,axis=1))
+
+
+def TotalFieldMat(X,Alpha):
+    UU = np.zeros((X.shape[0],Alpha.shape[0]), dtype=np.complex)
+    for i in range(X.shape[0]): 
+        UU[i] = u(i, Alpha)
     
-    return U 
-
-
+    return UU
+    
+    
 #Return an array of scattering solution at the point x with different incident 
 #direction alphas
 #X[i]: a point in R^3   
@@ -143,7 +158,7 @@ def u(i, Alpha):
     return U    
     
 
-#Define the scattering function that needs to be minimized    
+#The L2 norm(rho) that needs to be minimized to find Nu  
 def fun(Nu):
     global Theta, X, Alpha, delta
                 
@@ -166,7 +181,7 @@ def Optimize(Theta):
     for l in range(Alpha.shape[0]):
         Nu[l] = np.sum(nu*YCubeA[l])
         
-    res = optimize.minimize(fun, Nu, method='BFGS', options={'gtol':1e-3, 'disp': True})  #the best              
+    res = optimize.minimize(fun, Nu, method='BFGS', options={'gtol':1e-6, 'disp': True})  #the best              
     #res = optimize.fmin_cg(fun, nu, gtol=1e-4)    
     #res = optimize.least_squares(fun, nu)
     
@@ -209,14 +224,101 @@ def FourierPotential(q, psi):
     global a
     
     t = np.linalg.norm(psi)
-    return ((pi4*q)/(t**3))*(-t*a*np.cos(t*a)+np.sin(t*a))
+    ta = t*a
+    return ((pi4*q)/(t*t*t))*(-ta*np.cos(ta)+np.sin(ta))
+    
+    
+#Compute the Fourier transform of the potential q directly
+#psi = thetap-theta, |thetap| -> infinity
+#theta, thetap in M={z: z in C, z.z=1}
+def FourierPotential1(q, psi):
+    global Alpha, numRadii, n, a
+    
+    #Create a grid for the ball B(a)
+    Ba = np.zeros((Alpha.shape[0]*numRadii,3), dtype=np.double)
+    AnnulusRadi = np.linspace(a/10, a, numRadii)
+    i = 0
+    for R in AnnulusRadi: 
+        Ba[i:i+Alpha.shape[0]] = Alpha*R
+        i += Alpha.shape[0]
+    
+    deltaBa = (pi4*(a*a*a))/(3*Ba.shape[0])
+    ISum = 0    
+    for y in Ba:
+        ISum += np.exp(-1j*np.dot(psi,y))
+        
+    return ISum*q*deltaBa    
 
+
+#Compute the Fourier transform of the potential q using sympy (Very slow)
+#psi = thetap-theta, |thetap| -> infinity
+#theta, thetap in M={z: z in C, z.z=1}
+def FourierPotential2(q, psi):
+    global a
+    r, t, p = sp.symbols('r, t, p')
+    
+    f = sp.exp(-1j*r*(sp.cos(t)*sp.sin(p)*psi[0] + sp.sin(t)*sp.sin(p)*psi[1] + sp.cos(p)*psi[2]))*r*r*sp.sin(p)  
+    I = sp.integrate(f, (r, 0, a), (t, 0, 2*sp.pi), (p, 0, sp.pi))
+    
+    return q*I
+    
+    
+################## Visualize results ###################
+#@nb.jit(target='cpu', cache=True)
+def Visualize(Matrix):
+    n = np.min(Matrix.shape)
+    R = np.abs(Matrix[0:n,0:n])
+    
+    ############## Cartesian plot ##############
+    Theta = np.linspace(0, 2*np.pi, n)
+    Phi = np.linspace(0, np.pi, n)
+    PHI, THETA = np.meshgrid(Phi, Theta)
+    
+    X1 = R * np.sin(PHI) * np.cos(THETA)
+    X2 = R * np.sin(PHI) * np.sin(THETA)
+    X3 = R * np.cos(PHI)
+    
+    N = R/R.max()
+    
+    #matplotlib.rc('text', usetex=True)
+    #matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+    fig, ax = plt.subplots(subplot_kw=dict(projection='3d'), figsize=(12,10))
+    im = ax.plot_surface(X1, X2, X3, rstride=1, cstride=1, facecolors=cm.jet(N))
+    #im = ax.scatter3D(X1,X2,X3)
+    ax.set_title('Scattering Plot', fontsize=15)
+    m = cm.ScalarMappable(cmap=cm.jet)
+    m.set_array(R)    # Assign the unnormalized data array to the mappable
+                      #so that the scale corresponds to the values of R
+    fig.colorbar(m, shrink=0.8);
+    
+    ############## Spherical plot ##############
+    # Coordinate arrays for the graphical representation
+    x = np.linspace(-np.pi, np.pi, n)
+    y = np.linspace(-np.pi/2, np.pi/2, n)
+    X, Y = np.meshgrid(x, y)
+    
+    # Spherical coordinate arrays derived from x, y
+    # Necessary conversions to get Mollweide right
+    theta = x.copy()    # physical copy
+    theta[x < 0] = 2 * np.pi + x[x<0]
+    phi = np.pi/2 - y
+    PHI, THETA = np.meshgrid(phi, theta)
+    
+    fig, ax = plt.subplots(subplot_kw=dict(projection='mollweide'), figsize=(10,8))
+    im = ax.pcolormesh(X, Y , R)
+    #ax.set_xticklabels(xlabels, fontsize=14)
+    #ax.set_yticklabels(ylabels, fontsize=14)
+    ax.set_title('Scattering Plot', fontsize=15)
+    ax.set_xlabel(r'$\theta$', fontsize=20)
+    ax.set_ylabel(r'$\phi$', fontsize=20)
+    ax.grid()
+    fig.colorbar(im, orientation='horizontal');  
+      
     
 ########################## MAIN FUNCTION ###########################  
     
 #def main():
 
-ZERO = 10**(-16)
 pi_2 = np.pi/2
 pi2 = 2*np.pi
 pi4 = 4*np.pi
@@ -234,15 +336,17 @@ a1 = a*1.1
 #Create an annulus X(a1,b)
 b = 1.2
 #Volume of the annulus X
-VolX = (pi4/3)*(b**3-a1**3)  
+VolX = (pi4/3)*(b*b*b-a1*a1*a1)  
 #Divide the radius of the annulus from a->b into numRadii parts
 numRadii = 2
 
+#q cannot be the same as k^2
 q = 50
 print("The potential in Schrodinger operator (Laplace+k^2-q), q =", q)
 k = 1
-kappa = k**2 - q
+kappa = k*k - q
 
+#unit vector that indicates the direction of incoming wave
 alpha = np.array([0,0,1])
 print("Incident field direction, alpha =", alpha)
 
@@ -300,7 +404,8 @@ H = np.zeros((X.shape[0],n))
 HP = H
 for i in range(X.shape[0]):
     H[i], HP[i] = special.sph_yn(n-1, np.linalg.norm(X[i])) 
-    
+ 
+#Cube of spherical harmonics
 YCubeA = complexYCube(Alpha)
 XX = X
 for i in range(X.shape[0]):
@@ -322,6 +427,9 @@ error = np.abs(Fq1-Fq2)/np.abs(Fq2);
 print("Relative error:", error)
 
 print("\nTime elapsed:", time.time()-startTime,"seconds")
+
+UU = TotalFieldMat(X,Alpha)
+Visualize(UU)
 
 #if __name__ == "__main__":
 #    main()
